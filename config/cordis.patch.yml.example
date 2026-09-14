@@ -1,0 +1,38 @@
+# 2026 REFERENCE IMPLEMENTATION.
+# Host/profile adapters. Keep credentials outside this file.
+
+# Primary implementation provider.
+- id: subagent-claude-code
+  config:
+    providerName: claude-code
+    permissionMode: acceptEdits
+    env:
+      ANTHROPIC_MODEL: claude-sonnet-5
+
+# Independent challenger / secondary provider.
+- id: subagent-codex
+  config:
+    providerName: codex
+    permissionMode: approve-for-me
+
+# Durable memory.
+# IMPORTANT: do not hard-code one project here.
+# The root planner establishes project context per session using the active cwd.
+- insert:
+    - id: mcp-engram
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: engram
+        transport: stdio
+        command: engram
+        args:
+          - mcp
+          - --tools=agent
+        env: {}
+        toolCallTimeoutMs: 60000
+        failOnStartupError: true
+        reconnect:
+          enabled: true
+          initialDelayMs: 500
+          maxDelayMs: 30000
+          maxAttempts: 10

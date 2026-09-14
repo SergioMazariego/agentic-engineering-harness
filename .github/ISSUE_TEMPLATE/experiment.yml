@@ -1,0 +1,36 @@
+name: Experiment
+description: Propose or record a reproducible orchestration experiment
+title: "[Experiment] "
+labels: ["experiment"]
+body:
+  - type: textarea
+    id: hypothesis
+    attributes:
+      label: Hypothesis
+      description: State a falsifiable claim.
+    validations:
+      required: true
+  - type: textarea
+    id: baseline
+    attributes:
+      label: Baseline
+    validations:
+      required: true
+  - type: textarea
+    id: treatment
+    attributes:
+      label: Treatment
+    validations:
+      required: true
+  - type: textarea
+    id: metrics
+    attributes:
+      label: Metrics
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence / reproduction plan
+    validations:
+      required: true

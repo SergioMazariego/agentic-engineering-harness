@@ -1,0 +1,17 @@
+# 2026 REFERENCE IMPLEMENTATION.
+# Replace model/provider choices as the ecosystem changes.
+# The architecture does not depend on these exact names.
+
+ui-onboarding:
+  welcomeNoticeVersion: 2026-08-13.1
+
+llm-pi-ai:
+  providers:
+    anthropic:
+      apiKeyEnv: ANTHROPIC_API_KEY
+      streamIdleTimeoutMs: 300000
+
+agent-default-model:
+  provider: anthropic
+  model: claude-opus-5
+  reasoningEffort: high
