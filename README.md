@@ -2,11 +2,13 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-A vendor-agnostic research harness for hierarchical software-engineering agents, plus the exact reference implementation validated on Windows in September 2026.
+This repository is a working DSH (DeepSeek Harness) configuration for a hierarchical software-engineering agent: a root planner that owns the objective, a subplanner that decomposes bounded work, an implementation worker, an authoritative verifier, an independent challenger, and durable memory, each scoped down instead of one model holding every permission at once. It is validated end to end on Windows, and it is published so you can clone it, run it against a real repository, and change it.
 
 > Planner decides. Worker implements. Verifier proves. Challenger attacks. Memory remembers.
 
 I built this to find out whether splitting an engineering agent into separate roles, each with a narrower job and a harder boundary, actually beats pointing one strong model at a repository and letting it run. I work in adversarial simulation, detection engineering, and DFIR, and I wrote this on my own time because I wanted a setup I could reproduce and argue with, not a demo.
+
+The role contracts in `presets/self-driving/agent.cordis.yml` are written to outlive DSH, Claude, and Engram. That's a design goal, not a proven property. I have not ported them to a second runtime yet, so I am not calling this project vendor-agnostic until a port actually holds up. See "Porting the architecture to another runtime" below for what your runtime would need to provide.
 
 ## What this is, and what it is not
 
@@ -65,7 +67,7 @@ The role names in this diagram are the part meant to survive. The tools that fil
 | Authoritative verification | Root-level Git / PowerShell / project test commands |
 | Platform tested | Windows + PowerShell |
 
-These are the adapters validated in V0.1, not a permanent commitment. The role contracts in `presets/self-driving/agent.cordis.yml` are the part meant to last; swap any row in this table without touching the contracts and the architecture should still hold.
+These are the adapters validated in V0.1, not a permanent commitment. The role contracts in `presets/self-driving/agent.cordis.yml` are the part meant to last; swap any row in this table and the contracts should still apply without a rewrite. That claim has not been tested against a second runtime, model, or memory provider. V0.1 validated one specific stack, not portability itself.
 
 ## Reading the role prompts
 
@@ -237,9 +239,24 @@ Do NOT save:
 - agent coordination state.
 ```
 
-## Getting started
+## Porting the architecture to another runtime
 
-This is the path that was actually followed to produce the V0.1 result. Follow it in order. Each step names the exact file it touches.
+DSH is the runtime this architecture happens to be running on today. If you want the same role model on something else, LangGraph, a supervisor loop you wrote yourself, or whatever ships next year, your runtime needs to provide a specific set of properties. This is not a pitch for DSH. It is a checklist, derived from what `presets/self-driving/agent.cordis.yml` actually relies on, that you can hold your own runtime against.
+
+| Property the runtime must provide | How DSH provides it today |
+|---|---|
+| A root role that owns the objective and is the only role permitted to accept completion | The root persona states this directly (quoted above, under "Root planner"). No other role in the preset has a path to the user-facing session: a subplanner and a worker both report to whoever called them, not to the human. |
+| A way to hand a worker a bounded task and get back a structured report, without letting the worker declare the overall job done | The root and subplanner personas define what a delegated task and a returned report must contain (see "Worker and challenger" above). `subagent_claude_code` and `subagent_codex` return their output to the caller as a tool result; DSH gives neither one a separate path to end the session. |
+| Per-role tool permissions enforced by the runtime, not merely requested in a prompt | The subplanner's `toolFilter.deny` list (quoted above, under "Structural enforcement versus prompt policy") removes `write`, `edit`, `pwsh`, and `subagent_codex`, and `maxDepth: 2` caps recursion. Cordis enforces both regardless of what the subplanner's own persona says. Worker cardinality shows what happens without that enforcement: the V0.1 task needed exactly one implementation worker, that limit was never added to `toolFilter` or `maxDepth`, only written into a sentence, and the subplanner spawned a second worker anyway. That gap is the reason this property belongs on the runtime, not in a prompt. |
+| A durable knowledge store kept separate from the runtime's own coordination state, with project identity established explicitly from the active workspace rather than inferred from the memory process's working directory | Engram runs as its own long-lived MCP process, outside Cordis's session state. The repository DSH happens to be sitting in is not necessarily the directory that process started from, so the root persona calls `mem_session_start` with `directory` set explicitly to the workspace `cwd` and treats the project Engram returns as authoritative for the session. |
+| A trace or run record sufficient to reconstruct which agents participated, after the run is over | Both `subagent_claude_code` and `subagent_codex` run with `backgroundMode: one-shot`; DSH stops listing a one-shot child in the continuable-agent view the moment it exits. Run records were what let the V0.1 write-up reconstruct lineage instead of the live-agent view. |
+| The ability to route different roles to different models, and different vendors, if you want | The root planner defaults to `claude-opus-5` (`settings.yaml`), the subplanner is pinned to `claude-sonnet-5` directly in the preset's `agentOptions`, the Claude Code worker gets `claude-sonnet-5` through `cordis.patch.yml`'s `ANTHROPIC_MODEL` env var, and the challenger runs on Codex, a different vendor entirely, through `providerName: codex`. Point every role at the same model and "independent challenge" collapses into asking the same model twice. |
+
+If you port this to a different runtime, tell me what happened, especially if the documented findings don't hold up. A clean rerun on DSH mostly confirms what I already believe. A port where the worker-cardinality gap doesn't reproduce, because the new runtime enforces cardinality in a way this preset doesn't, tells me more about whether the architecture generalizes than another green run on my own stack would.
+
+## Getting started: the DSH path
+
+Everything below is DSH-specific. It is the exact path that was followed to produce the V0.1 result on the DeepSeek Harness, not a generic multi-agent tutorial. If you are porting the architecture to a different runtime, read "Porting the architecture to another runtime" above instead; come back here if you want to run this project as published. Follow the steps in order. Each one names the exact file it touches.
 
 ### 1. Prerequisites
 
